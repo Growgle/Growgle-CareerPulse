@@ -319,7 +319,7 @@ Return ONLY valid minified JSON (no markdown, no commentary before/after). Shape
 }
 
 LOGIC & RULES:
-- 4-6 phases total. Order them logically (fundamentals -> specialization -> integration -> professional polish).
+- Max 3 phases total. Max 2 milestones per phase.. Order them logically (fundamentals -> specialization -> integration -> professional polish).
 - A phase or milestone is 'completed' only if its core skills are already in user skills. Partially covered => 'in-progress'. Others 'pending'.
 - completionRate (%) should reflect weighted progress over all milestones.
 - Milestone durations: use weeks for granular items; phase duration sum should roughly match totalDuration.
