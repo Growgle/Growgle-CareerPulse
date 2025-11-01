@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import insightsRoutes from './src/routes/insightsRoutes.js';
+import jobsRoutes from './src/routes/jobsRoutes.js';
 
 // Basic env validation & helpful warnings
 const baseRequired = ['NEWS_API_KEY','PROJECT_ID'];
@@ -49,6 +50,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api', insightsRoutes);
+app.use('/api/jobs', jobsRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -68,7 +70,15 @@ app.get('/', (req, res) => {
       health: '/health',
       setup: '/api/setup',
       ingestNews: 'POST /api/ingest/news',
-      insights: 'GET /api/insights?skills=python,js&role=engineer'
+      insights: 'GET /api/insights?skills=python,js&role=engineer',
+      jobs: {
+        ingest: 'POST /api/jobs/ingest { query, page }',
+        talent: {
+          createCompany: 'POST /api/jobs/talent/company { displayName, externalId? }',
+          createJob: 'POST /api/jobs/talent/job { title, company_name, description, apply_link, location, employment_type, job_id }',
+          search: 'GET /api/jobs/talent/search?q=frontend+developer&location=Bangalore'
+        }
+      }
     }
   });
 });
