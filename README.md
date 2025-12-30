@@ -512,5 +512,3 @@ npm test      # Run tests (when implemented)
 2. **Business logic**: Extend `src/services/careerInsightsService.js`
 3. **External APIs**: Add clients to `src/utils/`
 4. **GCP integrations**: Extend clients in `src/gcpclient/` or `src/vertexclient/`
-
-hi
