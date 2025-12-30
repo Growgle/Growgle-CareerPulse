@@ -1,10 +1,41 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { createRequire } from 'module';
 import insightsRoutes from './src/routes/insightsRoutes.js';
 import jobsRoutes from './src/routes/jobsRoutes.js';
-import { agents } from './src/agents/agent.js';
+import { agents as srcAgents } from './src/agents/agent.js';
 import { InMemoryRunner } from '@google/adk';
+
+function loadAdkAgents() {
+  const require = createRequire(import.meta.url);
+  const baseDir = path.resolve(process.cwd(), 'adk_agents');
+  const agentDirs = [
+    'careerPlanningAgent',
+    'skillGapRoadmapAgent',
+    'ragIntelligenceAgent',
+    'feedbackAdaptationAgent',
+    'jobSearchApplicationAgent'
+  ];
+
+  const loaded = {};
+  for (const dirName of agentDirs) {
+    // Each adk_agents/<name>/agent.js exports { rootAgent }
+    const mod = require(path.join(baseDir, dirName, 'agent.js'));
+    if (!mod?.rootAgent) {
+      throw new Error(`adk_agents/${dirName}/agent.js must export rootAgent`);
+    }
+    loaded[dirName] = mod.rootAgent;
+  }
+  return loaded;
+}
+
+const agents = (process.env.AGENTS_SOURCE || '').toLowerCase() === 'adk_agents'
+  ? loadAdkAgents()
+  : srcAgents;
+
+console.log(`Agents source: ${(process.env.AGENTS_SOURCE || '').toLowerCase() === 'adk_agents' ? 'adk_agents (CommonJS)' : 'src/agents (ESM)'}`);
 
 // Basic env validation & helpful warnings
 const baseRequired = ['NEWS_API_KEY','PROJECT_ID'];

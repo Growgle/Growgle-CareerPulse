@@ -2,8 +2,23 @@ import careerInsightsService from '../services/careerInsightsService.js';
 import jobsService from '../services/jobsService.js';
 import overviewService from '../services/overviewService.js';
 import synthesisService from '../services/synthesisService.js';
+import roadmapService from '../services/roadmapService.js';
+import ragIntelligenceService from '../services/ragIntelligenceService.js';
 
 // Tool definitions
+
+function normalizeToolResult(result) {
+  if (result === undefined) return {};
+  if (result === null) return { value: null };
+  if (Array.isArray(result)) return { items: result };
+  if (typeof result === 'object') return result;
+  return { value: result };
+}
+
+function throwAdkJsonError(code, message) {
+  // ADK tries to JSON.parse(error.message) for model/tool errors.
+  throw new Error(JSON.stringify({ error: { code, message } }));
+}
 
 export const ingestNewsTool = {
   name: 'ingestNews',
@@ -18,7 +33,7 @@ export const ingestNewsTool = {
     required: ['query']
   },
   execute: async ({ query, pageSize, includeTrends }) => {
-    return await careerInsightsService.ingestNews(query, { pageSize, includeTrends });
+    return normalizeToolResult(await careerInsightsService.ingestNews(query, { pageSize, includeTrends }));
   }
 };
 
@@ -34,7 +49,7 @@ export const ingestJobsTool = {
     required: ['query']
   },
   execute: async ({ query, page }) => {
-    return await jobsService.fetchAndIngestRapidJobs({ query, page });
+    return normalizeToolResult(await jobsService.fetchAndIngestRapidJobs({ query, page }));
   }
 };
 
@@ -49,10 +64,60 @@ export const getCareerInsightsTool = {
       experience: { type: 'string', description: 'Experience level (e.g., "mid-level").' },
       profileFreeText: { type: 'string', description: 'Additional context about the user.' }
     },
-    required: ['role', 'skills']
+    // NOTE: @google/genai rejects schemas that contain both `type` and `anyOf`.
+    // We'll validate this requirement at runtime instead.
   },
   execute: async (userProfile) => {
-    return await careerInsightsService.generateCareerInsights(userProfile);
+    const hasRole = Boolean(userProfile?.role && String(userProfile.role).trim());
+    const hasFreeText = Boolean(userProfile?.profileFreeText && String(userProfile.profileFreeText).trim());
+    if (!hasRole && !hasFreeText) {
+      throwAdkJsonError(400, "getCareerInsights requires either 'role' or 'profileFreeText'.");
+    }
+    return normalizeToolResult(await careerInsightsService.generateCareerInsights(userProfile));
+  }
+};
+
+export const generateRoadmapTool = {
+  name: 'generateRoadmap',
+  description: 'Builds a structured skill-gap roadmap (phases + milestones + suggested certifications) for a target role.',
+  parameters: {
+    type: 'object',
+    properties: {
+      targetRole: { type: 'string', description: 'The target role/title to build a roadmap for.' },
+      skills: { type: 'string', description: 'Comma-separated current skills.' },
+      currentExperience: { type: 'string', description: 'Current experience (free text).' },
+      targetDuration: { type: 'string', description: 'Optional hint like "6 months" / "12 months".' }
+    },
+    required: ['targetRole']
+  },
+  execute: async ({ targetRole, skills, currentExperience, targetDuration }) => {
+    return normalizeToolResult(await roadmapService.generateRoadmap({ targetRole, skills, currentExperience, targetDuration }));
+  }
+};
+
+export const exploreRagTool = {
+  name: 'exploreRag',
+  description: 'Retrieves and consolidates market signals + geo/policy context into a single verified answer.',
+  parameters: {
+    type: 'object',
+    properties: {
+      question: { type: 'string', description: 'User question to investigate.' },
+      role: { type: 'string', description: 'Optional role context.' },
+      skills: { type: 'string', description: 'Optional skills context.' },
+      experience: { type: 'string', description: 'Optional experience level.' },
+      interests: { type: 'string', description: 'Optional interests.' },
+      location: { type: 'string', description: 'Optional location.' },
+      profileFreeText: { type: 'string', description: 'Optional full user narrative.' },
+      includeTrending: { type: 'boolean', description: 'Include trending skills signal (default true).' }
+    },
+    required: ['question']
+  },
+  execute: async ({ question, includeTrending, ...profile }) => {
+    return normalizeToolResult(await ragIntelligenceService.explore({
+      question,
+      profile,
+      includeTrending: includeTrending !== false
+    }));
   }
 };
 
@@ -68,7 +133,7 @@ export const searchJobsTool = {
     required: ['query']
   },
   execute: async ({ query, location }) => {
-    return await jobsService.talentSearchJobs({ query, location });
+    return normalizeToolResult(await jobsService.talentSearchJobs({ query, location }));
   }
 };
 
@@ -86,7 +151,7 @@ export const getOverviewTool = {
   },
   execute: async ({ industry, role, skills }) => {
     // Map industry to query as overviewService uses query for keywords
-    return await overviewService.getOverview({ query: industry, role, skills }); 
+    return normalizeToolResult(await overviewService.getOverview({ query: industry, role, skills }));
   }
 };
 
@@ -104,6 +169,6 @@ export const synthesizeReportTool = {
     required: ['realTimeText', 'governmentText']
   },
   execute: async ({ realTimeText, governmentText, role, question }) => {
-    return await synthesisService.synthesize({ realTimeText, governmentText, role, question });
+    return normalizeToolResult(await synthesisService.synthesize({ realTimeText, governmentText, role, question }));
   }
 };

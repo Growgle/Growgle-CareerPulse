@@ -1,5 +1,14 @@
-import { LlmAgent, FunctionTool } from '@google/adk';
-import * as tools from './tools.js';
+import { config } from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// ADK Web imports this file directly for agent discovery.
+// Ensure env vars are loaded before importing any services/clients.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+config({ path: path.resolve(__dirname, '../../.env') });
+
+const { LlmAgent, FunctionTool } = await import('@google/adk');
+const tools = await import('./tools.js');
 
 // Define tools
 const newsTool = new FunctionTool(tools.ingestNewsTool);
@@ -8,56 +17,58 @@ const insightsTool = new FunctionTool(tools.getCareerInsightsTool);
 const searchTool = new FunctionTool(tools.searchJobsTool);
 const overviewTool = new FunctionTool(tools.getOverviewTool);
 const synthesisTool = new FunctionTool(tools.synthesizeReportTool);
+const roadmapTool = new FunctionTool(tools.generateRoadmapTool);
+const exploreRagTool = new FunctionTool(tools.exploreRagTool);
 
-// 1. News Agent
-export const newsAgent = new LlmAgent({
-  name: 'NewsAgent',
+// 1) Career Planning Agent
+export const careerPlanningAgent = new LlmAgent({
+  name: 'CareerPlanningAgent',
   model: 'gemini-2.0-flash',
-  description: 'Responsible for fetching and ingesting news articles related to career trends and industries.',
-  tools: [newsTool],
-  instructions: 'You are a news agent. Your goal is to find relevant news articles based on user queries and ingest them into the system. Use the ingestNews tool.'
+  description: 'Understands goals and plans long-term career strategies.',
+  tools: [insightsTool, overviewTool, synthesisTool, newsTool],
+  instructions: "You are the Career Planning Agent. You help users clarify career goals and create a long-term strategy (90 days to 2 years). Prefer calling getCareerInsights early using role and/or profileFreeText (do not block on missing skills). Use getOverview when market context is needed. Use synthesizeReport only when the user provides two text sources to combine. Ask at most 2 clarifying questions if needed; otherwise make reasonable assumptions and proceed."
 });
 
-// 2. Jobs Agent
-export const jobsAgent = new LlmAgent({
-  name: 'JobsAgent',
+// 2) Skill Gap & Roadmap Agent
+export const skillGapRoadmapAgent = new LlmAgent({
+  name: 'SkillGapRoadmapAgent',
   model: 'gemini-2.0-flash',
-  description: 'Responsible for fetching and ingesting job postings from external sources.',
-  tools: [jobsTool],
-  instructions: 'You are a jobs agent. Your goal is to find job postings based on user queries and ingest them into the system. Use the ingestJobs tool.'
+  description: 'Identifies missing skills and builds adaptive learning paths.',
+  tools: [roadmapTool, insightsTool],
+  instructions: "You are the Skill Gap & Roadmap Agent. When asked for a roadmap or skill-gap plan, call generateRoadmap with targetRole and any skills/experience you can infer from the user. If the user didn’t list skills, infer a reasonable baseline from their current role and proceed. Then explain the roadmap succinctly and propose a weekly execution plan."
 });
 
-// 3. Career Insights Agent
-export const insightsAgent = new LlmAgent({
-  name: 'InsightsAgent',
+// 3) RAG Intelligence Agent
+export const ragIntelligenceAgent = new LlmAgent({
+  name: 'RagIntelligenceAgent',
   model: 'gemini-2.0-flash',
-  description: 'Analyzes user profiles to generate personalized career insights.',
-  tools: [insightsTool],
-  instructions: 'You are a career insights agent. Your goal is to provide personalized career advice using the getCareerInsights tool. This tool requires the user\'s current role and a list of skills. If the user does not provide these details, ask them clarifying questions to gather the necessary information before calling the tool. Be helpful and conversational.'
+  description: 'Retrieves verified data from policies, research, and industry sources.',
+  tools: [exploreRagTool],
+  instructions: "You are the RAG Intelligence Agent. Your job is to answer user questions using verified signals (market + geo/policy when configured). Always call exploreRag for substantive questions and return a single consolidated answer. If the question is vague, ask one clarifying question."
 });
 
-// 4. Job Search Agent
-export const searchAgent = new LlmAgent({
-  name: 'SearchAgent',
+// 4) Feedback & Adaptation Agent
+export const feedbackAdaptationAgent = new LlmAgent({
+  name: 'FeedbackAdaptationAgent',
   model: 'gemini-2.0-flash',
-  description: 'Helps users find specific job openings using the Talent API.',
-  tools: [searchTool],
-  instructions: 'You are a job search agent. Help users find jobs that match their criteria using the searchJobs tool. If the user does not specify a location or query, ask them for it.'
+  description: 'Learns from user progress and updates recommendations.',
+  tools: [roadmapTool, insightsTool],
+  instructions: "You are the Feedback & Adaptation Agent. Track what the user has already done in this session, ask for concrete progress signals (time/week, completed milestones, blockers), and update the plan accordingly. If the user wants an updated roadmap, call generateRoadmap again with updated skills and constraints, then summarize what changed and what to do next week."
 });
 
-// 5. Overview Agent (Coordinator/Synthesis)
-export const overviewAgent = new LlmAgent({
-  name: 'OverviewAgent',
+// 5) Job Search & Application Agent
+export const jobSearchApplicationAgent = new LlmAgent({
+  name: 'JobSearchApplicationAgent',
   model: 'gemini-2.0-flash',
-  description: 'Provides a high-level market overview and synthesizes reports.',
-  tools: [overviewTool, synthesisTool],
-  instructions: 'You are an overview agent. Provide market overviews and synthesize complex reports based on available data. Use getOverview and synthesizeReport tools.'
+  description: 'Matches user profiles with relevant jobs, searches opportunities, and drafts application materials.',
+  tools: [searchTool, jobsTool],
+  instructions: "You are the Job Search & Application Agent. Use searchJobs to find opportunities (ask for location if missing). Use ingestJobs only when the user explicitly asks to ingest/sync job data. You can also draft tailored resume bullets, cold emails, and cover letters directly in your response."
 });
 
 export const agents = {
-  newsAgent,
-  jobsAgent,
-  insightsAgent,
-  searchAgent,
-  overviewAgent
+  careerPlanningAgent,
+  skillGapRoadmapAgent,
+  ragIntelligenceAgent,
+  feedbackAdaptationAgent,
+  jobSearchApplicationAgent
 };

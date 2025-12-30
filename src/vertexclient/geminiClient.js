@@ -1,20 +1,30 @@
 import { GoogleAuth } from 'google-auth-library';
 import { VertexAI } from '@google-cloud/vertexai';
 
-const PROJECT_ID = process.env.PROJECT_ID || process.env.GCP_PROJECT_ID;
-const LOCATION = process.env.LOCATION || process.env.GCP_LOCATION || 'us-central1';
 const GEN_MODEL = process.env.VERTEX_GEN_MODEL || 'gemini-2.5-flash';
 const EMBED_MODEL = process.env.VERTEX_EMBED_MODEL || 'text-embedding-004';
 
 class GeminiClient {
   constructor() {
-  this.auth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
-  this.vertexAI = new VertexAI({ project: PROJECT_ID, location: LOCATION });
+    this.auth = null;
+    this.vertexAI = null;
     this.accessToken = null;
     this.tokenExpiry = null;
   }
 
+  init() {
+    if (!this.auth) {
+      this.auth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
+    }
+    if (!this.vertexAI) {
+      const project = process.env.PROJECT_ID || process.env.GCP_PROJECT_ID;
+      const location = process.env.LOCATION || process.env.GCP_LOCATION || 'us-central1';
+      this.vertexAI = new VertexAI({ project, location });
+    }
+  }
+
   async getAccessToken() {
+    this.init();
     // Check if token is still valid
     if (this.accessToken && this.tokenExpiry && Date.now() < this.tokenExpiry) {
       return this.accessToken;
@@ -45,6 +55,7 @@ class GeminiClient {
   }
 
   async generateContent(prompt, options = {}) {
+    this.init();
     const candidates = this.getModelCandidates(GEN_MODEL);
     let lastErr;
     for (const modelName of candidates) {
@@ -132,6 +143,7 @@ class GeminiClient {
   }
 
   async createEmbedding(text) {
+    this.init();
     try {
       const model = this.vertexAI.getGenerativeModel({ model: EMBED_MODEL });
       // The SDK supports embeddings via embedContent
