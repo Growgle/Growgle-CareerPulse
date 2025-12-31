@@ -1,6 +1,7 @@
 const path = require('path');
 const dotenv = require('dotenv');
 const { FunctionTool } = require('@google/adk');
+const { pathToFileURL } = require('url');
 
 function normalizeToolResult(result) {
   if (result === undefined) return {};
@@ -23,6 +24,12 @@ function makeTool(definition) {
   return new FunctionTool(definition);
 }
 
+function importService(serviceFileName) {
+  // Resolve services relative to the repo root (career_insights/), not process.cwd().
+  const absPath = path.resolve(__dirname, '../src/services', serviceFileName);
+  return import(pathToFileURL(absPath).href);
+}
+
 function makeTools() {
   const ingestNewsTool = makeTool({
     name: 'ingestNews',
@@ -37,7 +44,7 @@ function makeTools() {
       required: ['query']
     },
     execute: async ({ query, pageSize, includeTrends }) => {
-      const svc = (await import('../../src/services/careerInsightsService.js')).default;
+      const svc = (await importService('careerInsightsService.js')).default;
       return normalizeToolResult(await svc.ingestNews(query, { pageSize, includeTrends }));
     }
   });
@@ -54,7 +61,7 @@ function makeTools() {
       required: ['query']
     },
     execute: async ({ query, page }) => {
-      const svc = (await import('../../src/services/jobsService.js')).default;
+      const svc = (await importService('jobsService.js')).default;
       return normalizeToolResult(await svc.fetchAndIngestRapidJobs({ query, page }));
     }
   });
@@ -72,7 +79,7 @@ function makeTools() {
       }
     },
     execute: async (userProfile) => {
-      const svc = (await import('../../src/services/careerInsightsService.js')).default;
+      const svc = (await importService('careerInsightsService.js')).default;
       const hasRole = Boolean(userProfile?.role && String(userProfile.role).trim());
       const hasFreeText = Boolean(userProfile?.profileFreeText && String(userProfile.profileFreeText).trim());
       if (!hasRole && !hasFreeText) {
@@ -96,7 +103,7 @@ function makeTools() {
       required: ['targetRole']
     },
     execute: async ({ targetRole, skills, currentExperience, targetDuration }) => {
-      const svc = (await import('../../src/services/roadmapService.js')).default;
+      const svc = (await importService('roadmapService.js')).default;
       return normalizeToolResult(await svc.generateRoadmap({ targetRole, skills, currentExperience, targetDuration }));
     }
   });
@@ -119,7 +126,7 @@ function makeTools() {
       required: ['question']
     },
     execute: async ({ question, includeTrending, ...profile }) => {
-      const svc = (await import('../../src/services/ragIntelligenceService.js')).default;
+      const svc = (await importService('ragIntelligenceService.js')).default;
       return normalizeToolResult(await svc.explore({ question, profile, includeTrending: includeTrending !== false }));
     }
   });
@@ -136,7 +143,7 @@ function makeTools() {
       required: ['query']
     },
     execute: async ({ query, location }) => {
-      const svc = (await import('../../src/services/jobsService.js')).default;
+      const svc = (await importService('jobsService.js')).default;
       return normalizeToolResult(await svc.talentSearchJobs({ query, location }));
     }
   });
@@ -154,8 +161,8 @@ function makeTools() {
       required: []
     },
     execute: async ({ industry, role, skills }) => {
-      const svc = (await import('../../src/services/overviewService.js')).default;
-      return await svc.getOverview({ query: industry, role, skills });
+      const svc = (await importService('overviewService.js')).default;
+      return normalizeToolResult(await svc.getOverview({ query: industry, role, skills }));
     }
   });
 
@@ -173,8 +180,8 @@ function makeTools() {
       required: ['realTimeText', 'governmentText']
     },
     execute: async ({ realTimeText, governmentText, role, question }) => {
-      const svc = (await import('../../src/services/synthesisService.js')).default;
-      return await svc.synthesize({ realTimeText, governmentText, role, question });
+      const svc = (await importService('synthesisService.js')).default;
+      return normalizeToolResult(await svc.synthesize({ realTimeText, governmentText, role, question }));
     }
   });
 
