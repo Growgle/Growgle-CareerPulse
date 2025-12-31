@@ -22,6 +22,91 @@ npm run dev   # dev (nodemon)
 npm start     # prod
 ```
 
+## 🤖 Agentic Mode (Google ADK)
+
+This repo includes 5 Google ADK agents exposed via the API route `POST /api/agent/:name`.
+
+Agent names (use these in the URL):
+- `careerPlanningAgent`
+- `skillGapRoadmapAgent`
+- `ragIntelligenceAgent`
+- `feedbackAdaptationAgent`
+- `jobSearchApplicationAgent`
+
+Request body:
+- `prompt` (string, required)
+- `sessionId` (string, optional) — reuse the same `sessionId` across calls to keep chat/session continuity.
+
+### Call Agents via API (copy/paste)
+
+Career Planning Agent:
+```bash
+curl -sS http://localhost:3000/api/agent/careerPlanningAgent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "I am a software engineering student. Suggest the best career path for me and a 12-month plan."
+  }'
+```
+
+Skill Gap & Roadmap Agent:
+```bash
+curl -sS http://localhost:3000/api/agent/skillGapRoadmapAgent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Target role: Backend Engineer. Current skills: Python, SQL, basic Docker. Identify gaps and produce a structured roadmap."
+  }'
+```
+
+RAG Intelligence Agent:
+```bash
+curl -sS http://localhost:3000/api/agent/ragIntelligenceAgent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Summarize current market demand for Data Engineers and list top skills and certifications to prioritize."
+  }'
+```
+
+Feedback & Adaptation Agent:
+```bash
+curl -sS http://localhost:3000/api/agent/feedbackAdaptationAgent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Here is my current plan: (1) Learn DSA 2 weeks, (2) Build 1 project, (3) Apply to jobs. Critique and improve it with concrete milestones."
+  }'
+```
+
+Job Search & Application Agent:
+```bash
+curl -sS http://localhost:3000/api/agent/jobSearchApplicationAgent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Find roles that fit: Software Engineer Intern. Location: India. Skills: Python, React. Suggest search keywords and an application strategy."
+  }'
+```
+
+### Session continuity (chat-style)
+
+1) Make a first call and capture `sessionId` from the JSON response.
+
+2) Reuse that `sessionId` on later calls:
+```bash
+curl -sS http://localhost:3000/api/agent/careerPlanningAgent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionId": "session-REPLACE_ME",
+    "prompt": "Update the plan to focus more on system design and internships."
+  }'
+```
+
+### ADK Web UI (interactive)
+
+Run the ADK devtools web UI from the repo root:
+```bash
+npx adk web adk_agents
+```
+
+Then open the URL shown in the terminal output (it will typically be something like `http://localhost:8000`).
+
 ## 📡 Key Endpoints
 
 | Method | Endpoint | Purpose |
