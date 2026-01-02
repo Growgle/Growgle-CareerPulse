@@ -16,7 +16,6 @@ function throwAdkJsonError(code, message) {
 }
 
 function loadEnvFromRepoRoot(fromDir) {
-  // fromDir = __dirname of agent folder, e.g. adk_agents/newsAgent
   dotenv.config({ path: path.resolve(fromDir, '../../.env') });
 }
 
@@ -185,6 +184,81 @@ function makeTools() {
     }
   });
 
+  const getTrendingSkillsTool = makeTool({
+    name: 'getTrendingSkills',
+    description: 'Retrieves top trending skills from news mentions over a specified period with growth indicators and demand levels.',
+    parameters: {
+      type: 'object',
+      properties: {
+        days: { type: 'number', description: 'Lookback period in days (default: 7, max: 90).' },
+        limit: { type: 'number', description: 'Max number of trending skills to return (default: 10, max: 20).' }
+      },
+      required: []
+    },
+    execute: async ({ days = 7, limit = 10 }) => {
+      const bigqueryClient = (await import(pathToFileURL(path.resolve(__dirname, '../src/gcpclient/bigqueryClient.js')).href)).default;
+      const trends = await bigqueryClient.queryTopTrends(Math.min(days || 7, 90));
+      const top = Array.isArray(trends) ? trends.slice(0, Math.min(limit || 10, 20)) : [];
+      return normalizeToolResult({ trends: top, period: `${days} days`, count: top.length });
+    }
+  });
+
+  const getLatestJobsTool = makeTool({
+    name: 'getLatestJobs',
+    description: 'Fetches the most recently ingested jobs from BigQuery database (bypasses Talent API search).',
+    parameters: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Number of jobs to return (default: 20, max: 100).' }
+      },
+      required: []
+    },
+    execute: async ({ limit = 20 }) => {
+      const jobsServiceModule = await importService('jobsService.js');
+      const jobs = await jobsServiceModule.bqFetchLatestJobs({ limit: Math.min(limit || 20, 100) });
+      return normalizeToolResult({ jobs, count: jobs.length, source: 'bigquery' });
+    }
+  });
+
+  const validateSkillsAgainstMarketTool = makeTool({
+    name: 'validateSkillsAgainstMarket',
+    description: 'Validates a list of user skills against current market demand and trending data to identify which are in-demand, emerging, or declining.',
+    parameters: {
+      type: 'object',
+      properties: {
+        skills: { type: 'string', description: 'Comma-separated list of skills to validate.' },
+        targetRole: { type: 'string', description: 'Optional: target role context for relevance scoring.' }
+      },
+      required: ['skills']
+    },
+    execute: async ({ skills, targetRole }) => {
+      const bigqueryClient = (await import(pathToFileURL(path.resolve(__dirname, '../src/gcpclient/bigqueryClient.js')).href)).default;
+      const skillsArray = skills.split(',').map(s => s.trim()).filter(Boolean);
+      const trends = await bigqueryClient.queryTopTrends(30);
+      
+      const validation = skillsArray.map(skill => {
+        const match = trends.find(t => 
+          t.skill.toLowerCase().includes(skill.toLowerCase()) || 
+          skill.toLowerCase().includes(t.skill.toLowerCase())
+        );
+        return {
+          skill,
+          inDemand: !!match,
+          mentions: match?.mentions || 0,
+          rank: match ? trends.indexOf(match) + 1 : null,
+          status: match ? (match.mentions > 50 ? 'high-demand' : 'moderate-demand') : 'low-signal'
+        };
+      });
+      
+      return normalizeToolResult({
+        validatedSkills: validation,
+        totalSkills: skillsArray.length,
+        inDemandCount: validation.filter(v => v.inDemand).length,
+        targetRole
+      });
+    }
+  });
+
   return {
     ingestNewsTool,
     ingestJobsTool,
@@ -194,6 +268,9 @@ function makeTools() {
     searchJobsTool,
     getOverviewTool,
     synthesizeReportTool,
+    getTrendingSkillsTool,
+    getLatestJobsTool,
+    validateSkillsAgainstMarketTool,
   };
 }
 
