@@ -5,6 +5,7 @@ import path from 'path';
 import { createRequire } from 'module';
 import insightsRoutes from './src/routes/insightsRoutes.js';
 import jobsRoutes from './src/routes/jobsRoutes.js';
+import prepRoutes from './src/routes/prepRoutes.js';
 import { agents as srcAgents } from './src/agents/agent.js';
 import { InMemoryRunner } from '@google/adk';
 
@@ -16,7 +17,9 @@ function loadAdkAgents() {
     'skillGapRoadmapAgent',
     'ragIntelligenceAgent',
     'feedbackAdaptationAgent',
-    'jobSearchApplicationAgent'
+    'jobSearchApplicationAgent',
+    'resumeOptimizationAgent',
+    'jobPrepAgent'
   ];
 
   const loaded = {};
@@ -84,6 +87,7 @@ app.use(express.static('public')); // Serve static files
 
 // Routes
 app.use('/api', insightsRoutes);
+app.use('/api', prepRoutes);
 app.use('/api/jobs', jobsRoutes);
 
 // Agent endpoint
