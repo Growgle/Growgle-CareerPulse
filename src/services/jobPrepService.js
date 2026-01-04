@@ -130,13 +130,18 @@ function normalizeRoadmapForPrompt(roadmap) {
 }
 
 class JobPrepService {
-  async run({ targetRole, currentSkills = '', experience = '', location = '', targetDuration = '' } = {}) {
+  async run({ targetRole, currentSkills = '', experience = '', location = '', targetDuration = '', careerPath = 'job' } = {}) {
     const role = String(targetRole || '').trim();
     if (!role) throw new Error('Provide targetRole');
 
     const skills = String(currentSkills || '').trim();
     const exp = String(experience || '').trim();
     const loc = String(location || '').trim();
+    const path = String(careerPath || 'job').toLowerCase();
+    
+    // Validate career path
+    const validPaths = ['job', 'startup'];
+    const finalPath = validPaths.includes(path) ? path : 'job';
 
     // 1) Roadmap (structured JSON from existing service)
     const roadmap = await roadmapService.generateRoadmap({
@@ -159,16 +164,20 @@ class JobPrepService {
       insights = null;
     }
 
-    // 3) Jobs
+    // 3) Jobs (skip if founding a startup)
     let jobs = [];
     let jobsSource = '';
-    if (loc) {
-      jobs = await jobsService.talentSearchJobs({ query: role, location: loc });
-      jobsSource = 'talent_api';
-    } else {
-      const rows = await bqFetchLatestJobs({ limit: 25 });
-      jobs = Array.isArray(rows) ? rows : [];
-      jobsSource = 'bigquery_latest';
+    const shouldFetchJobs = finalPath !== 'startup' || (finalPath === 'startup' && loc);
+    
+    if (shouldFetchJobs) {
+      if (loc) {
+        jobs = await jobsService.talentSearchJobs({ query: role, location: loc });
+        jobsSource = 'talent_api';
+      } else {
+        const rows = await bqFetchLatestJobs({ limit: 25 });
+        jobs = Array.isArray(rows) ? rows : [];
+        jobsSource = 'bigquery_latest';
+      }
     }
 
     const jobsForPrompt = normalizeJobsForPrompt(jobs, { max: 10 });
@@ -177,6 +186,7 @@ class JobPrepService {
     // 4) Consolidate into one plan (LLM) as strict JSON
     const schemaHint = `{
   "assumptions": [string],
+  "careerPath": string,
   "gapAnalysis": {
     "strengths": [string],
     "gaps": [string],
@@ -188,19 +198,30 @@ class JobPrepService {
       { "week": number, "focus": string, "deliverables": [string] }
     ]
   },
-  "jobSearch": {
-    "recommendedTitles": [string],
-    "jobsToApply": [
-      { "title": string, "company": string, "location": string, "whyFit": string }
+  "careerStrategy": {
+    "recommendedPaths": [string],
+    "opportunities": [
+      { "type": string, "title": string, "company": string, "location": string, "whyFit": string }
     ],
-    "applicationStrategy": [string]
+    "actionPlan": [string]
+  },
+  "startupGuidance": {
+    "mvpSteps": [string],
+    "fundingOptions": [string],
+    "networking": [string]
   }
 }`;
 
-    const aiPrompt = `You are a job preparation coach. Build an end-to-end plan: gap analysis → learning plan → job search.
+    const careerPathContext = {
+      job: 'traditional employment (full-time, part-time, contract)',
+      startup: 'founding or joining an early-stage startup'
+    };
+
+    const aiPrompt = `You are a comprehensive career preparation coach. Build an end-to-end plan: gap analysis → learning plan → career strategy.
 
 INPUTS
 Target role: ${role}
+Career path: ${finalPath} (${careerPathContext[finalPath] || 'general'})
 Current skills: ${skills || 'Not provided'}
 Experience: ${exp || 'Not provided'}
 Location: ${loc || 'Not provided'}
@@ -211,13 +232,14 @@ ${insights?.insights?.aiAdvice ? String(insights.insights.aiAdvice).slice(0, 250
 ROADMAP SUMMARY (authoritative)
 ${JSON.stringify(roadmapForPrompt).slice(0, 6000)}
 
-JOBS (top matches / recent)
-${JSON.stringify(jobsForPrompt).slice(0, 6000)}
+${shouldFetchJobs ? `OPPORTUNITIES (jobs/gigs/roles)
+${JSON.stringify(jobsForPrompt).slice(0, 6000)}` : 'OPPORTUNITIES: User is founding a startup, skip job listings.'}
 
 OUTPUT REQUIREMENTS
 Return ONLY valid minified JSON. Shape:
 {
   "assumptions": [string],
+  "careerPath": "${finalPath}",
   "gapAnalysis": {
     "strengths": [string],
     "gaps": [string],
@@ -229,18 +251,25 @@ Return ONLY valid minified JSON. Shape:
       { "week": number, "focus": string, "deliverables": [string] }
     ]
   },
-  "jobSearch": {
-    "recommendedTitles": [string],
-    "jobsToApply": [
-      { "title": string, "company": string, "location": string, "whyFit": string }
+  "careerStrategy": {
+    "recommendedPaths": [string],
+    "opportunities": [
+      { "type": string, "title": string, "company": string, "location": string, "whyFit": string }
     ],
-    "applicationStrategy": [string]
+    "actionPlan": [string]
+  },
+  "startupGuidance": {
+    "mvpSteps": [string],
+    "fundingOptions": [string],
+    "networking": [string]
   }
 }
 
 RULES
 - weeklyPlan: EXACTLY 8 weeks. Keep deliverables concrete.
-- jobsToApply: up to 8 items. If job list lacks company/title fields, do best-effort mapping.
+- careerStrategy.opportunities: up to 8 items. Set "type" to "job" or "startup".
+- If careerPath is "startup", populate startupGuidance with actionable MVP steps (3-5), funding options (3-4), and networking tips (2-3).
+- If careerPath is "job", set startupGuidance to {"mvpSteps": [], "fundingOptions": [], "networking": []}.
 - Be realistic, no fluff.`;
 
     const { parsed: plan, finishReason } = await getJsonFromModel({ prompt: aiPrompt, schemaHint });
@@ -248,7 +277,8 @@ RULES
     return {
       success: true,
       targetRole: role,
-      jobsSource,
+      careerPath: finalPath,
+      jobsSource: shouldFetchJobs ? jobsSource : 'N/A (startup founder)',
       roadmap,
       insights: insights ? { success: insights.success, trending: insights.insights?.trending || [] } : null,
       result: plan,
