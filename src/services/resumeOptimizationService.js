@@ -88,7 +88,7 @@ async function getJsonFromModel({ prompt, schemaHint }) {
   const aiRaw = await geminiClient.generateContent(prompt, {
     responseMimeType: 'application/json',
     temperature: 0.35,
-    maxTokens: 2600,
+    maxTokens: 4000,
   });
 
   try {
@@ -113,7 +113,7 @@ Return ONLY JSON.`;
     const repaired = await geminiClient.generateContent(repairPrompt, {
       responseMimeType: 'application/json',
       temperature: 0.1,
-      maxTokens: 2600,
+      maxTokens: 4000,
     });
     try {
       return { parsed: parseModelJson(repaired?.text), rawText: repaired?.text, finishReason: repaired?.finishReason };
@@ -207,9 +207,12 @@ RULES
 - If job description is provided, align keywords strongly to it.
 - Do NOT invent experience; only rewrite/clarify what exists.
 - Keep rewritten bullets achievement-driven, add metrics only if present or safely inferable (e.g., "reduced latency" without % if unknown).
-- rewrittenBullets: 6-10 items.
-- topFixes: 3-5 items.
-- atsScore: be realistic.`;
+- rewrittenBullets: MUST include 6-10 items with { "original": string, "improved": string }. Extract existing bullets from the resume and improve them.
+- topFixes: MUST include 3-5 actionable items.
+- skillsSection: MUST categorize ALL skills from the resume into core/tools/cloud/data/other. Do NOT leave all categories empty.
+- formattingNotes: MUST include at least 2-3 items about ATS compatibility (headers, dates, special characters, columns, tables).
+- atsScore: be realistic (0-100).
+- ALL fields are REQUIRED. Do not return empty arrays.`;
 
     const { parsed, finishReason } = await getJsonFromModel({ prompt, schemaHint });
 
