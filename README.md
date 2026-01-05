@@ -22,6 +22,109 @@ npm run dev   # dev (nodemon)
 npm start     # prod
 ```
 
+## 🤖 Agentic Mode (Google ADK)
+
+This repo includes 5 Google ADK agents exposed via the API route `POST /api/agent/:name`.
+
+Agent names (use these in the URL):
+- `careerPlanningAgent`
+- `skillGapRoadmapAgent`
+- `ragIntelligenceAgent`
+- `feedbackAdaptationAgent`
+- `jobSearchApplicationAgent`
+
+Request body:
+- `prompt` (string, required)
+- `sessionId` (string, optional) — reuse the same `sessionId` across calls to keep chat/session continuity.
+
+### Call Agents via API (copy/paste)
+
+Career Planning Agent:
+```bash
+curl -sS http://localhost:3000/api/agent/careerPlanningAgent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "I am a software engineering student. Suggest the best career path for me and a 12-month plan."
+  }'
+```
+
+Skill Gap & Roadmap Agent:
+```bash
+curl -sS http://localhost:3000/api/agent/skillGapRoadmapAgent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Target role: Backend Engineer. Current skills: Python, SQL, basic Docker. Identify gaps and produce a structured roadmap."
+  }'
+```
+
+RAG Intelligence Agent:
+```bash
+curl -sS http://localhost:3000/api/agent/ragIntelligenceAgent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Summarize current market demand for Data Engineers and list top skills and certifications to prioritize."
+  }'
+```
+
+Feedback & Adaptation Agent:
+```bash
+curl -sS http://localhost:3000/api/agent/feedbackAdaptationAgent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Here is my current plan: (1) Learn DSA 2 weeks, (2) Build 1 project, (3) Apply to jobs. Critique and improve it with concrete milestones."
+  }'
+```
+
+Job Search & Application Agent:
+```bash
+curl -sS http://localhost:3000/api/agent/jobSearchApplicationAgent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Find roles that fit: Software Engineer Intern. Location: India. Skills: Python, React. Suggest search keywords and an application strategy."
+  }'
+```
+
+Resume Optimization Agent:
+```bash
+curl -sS http://localhost:3000/api/agent/resumeOptimizationAgent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Optimize my resume for a Senior DevOps role. Resume: [PASTE RESUME TEXT HERE]"
+  }'
+```
+
+Job Prep Agent (Jobs & Startups):
+```bash
+curl -sS http://localhost:3000/api/agent/jobPrepAgent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "I want to start an AI SaaS startup. I have 3 years of ML experience. Help me prepare."
+  }'
+```
+
+### Session continuity (chat-style)
+
+1) Make a first call and capture `sessionId` from the JSON response.
+
+2) Reuse that `sessionId` on later calls:
+```bash
+curl -sS http://localhost:3000/api/agent/careerPlanningAgent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionId": "session-REPLACE_ME",
+    "prompt": "Update the plan to focus more on system design and internships."
+  }'
+```
+
+### ADK Web UI (interactive)
+
+Run the ADK devtools web UI from the repo root:
+```bash
+npx adk web adk_agents
+```
+
+Then open the URL shown in the terminal output (it will typically be something like `http://localhost:8000`).
+
 ## 📡 Key Endpoints
 
 | Method | Endpoint | Purpose |
@@ -40,6 +143,8 @@ npm start     # prod
 | POST | `/api/roadmap` | Generate a structured skill development roadmap (LLM) |
 | POST | `/api/prompt` | Direct Gemini (LLM) pass-through prompt |
 | POST | `/api/explore` | Unified consolidated answer (career + external geo/policy) |
+| POST | `/api/job-prep` | End-to-end job prep (gap analysis + roadmap + strategy) |
+| POST | `/api/resume/optimize` | Optimize resume (ATS score, keyword gaps, rewrites) |
 
 Notes:
 - This endpoint aggregates data from BigQuery only (no Gemini/LLM calls).
@@ -243,7 +348,168 @@ Notes:
 - `/api/roadmap` and `/api/prompt` invoke the LLM; latency & costs depend on model configuration.
 - Keep prompts concise to reduce token usage and avoid truncation.
 
-### 9. Explore (Unified Career + Geo/Policy Consolidation)
+### 9. Job Prep (End-to-End Career Preparation)
+
+Generate a comprehensive career preparation plan including gap analysis, learning roadmap, and tailored strategy for either **jobs** or **startups**.
+
+**Supported Career Paths:**
+- `job` - Traditional employment (default)
+- `startup` - Founding or joining early-stage startups
+
+Basic example (job path):
+```bash
+curl -X POST http://localhost:3000/api/job-prep \
+  -H "Content-Type: application/json" \
+  -d '{
+    "targetRole": "Senior Backend Engineer",
+    "currentSkills": "Python, Django, PostgreSQL",
+    "experience": "3 years",
+    "location": "San Francisco",
+    "careerPath": "job"
+  }' | jq
+```
+
+Startup founder example:
+```bash
+curl -X POST http://localhost:3000/api/job-prep \
+  -H "Content-Type: application/json" \
+  -d '{
+    "targetRole": "AI SaaS Founder",
+    "currentSkills": "Python, Machine Learning, Product Management",
+    "experience": "5 years as ML Engineer",
+    "careerPath": "startup"
+  }' | jq
+```
+
+Fields (body):
+- `targetRole` (string, required): Target job title or founder role
+- `currentSkills` (string, optional): Comma-separated skills
+- `experience` (string, optional): Years or description
+- `location` (string, optional): City or region (enables job search)
+- `careerPath` (string, optional): `"job"` or `"startup"` (default: `"job"`)
+- `targetDuration` (string, optional): Timeline hint like `"3 months"`
+
+Response structure:
+```json
+{
+  "success": true,
+  "targetRole": "Senior Backend Engineer",
+  "careerPath": "job",
+  "result": {
+    "assumptions": ["..."],
+    "gapAnalysis": {
+      "strengths": ["..."],
+      "gaps": ["..."],
+      "prioritySkills": ["..."]
+    },
+    "learningPlan": {
+      "roadmapSummary": "...",
+      "weeklyPlan": [
+        { "week": 1, "focus": "...", "deliverables": ["..."] }
+      ]
+    },
+    "careerStrategy": {
+      "recommendedPaths": ["..."],
+      "opportunities": [
+        { "type": "job", "title": "...", "company": "...", "location": "...", "whyFit": "..." }
+      ],
+      "actionPlan": ["..."]
+    },
+    "startupGuidance": {
+      "mvpSteps": [],
+      "fundingOptions": [],
+      "networking": []
+    }
+  }
+}
+```
+
+**For startup path**, `startupGuidance` includes:
+- `mvpSteps`: Actionable steps to build MVP
+- `fundingOptions`: Bootstrapping, angels, accelerators
+- `networking`: Y Combinator, local tech meetups
+
+### 10. Resume Optimization
+
+Analyze and optimize resumes for ATS compatibility. Supports **plain text** and **LaTeX** formats (auto-detected).
+
+Basic example:
+```bash
+curl -X POST http://localhost:3000/api/resume/optimize \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resumeText": "Software Engineer with 3 years experience. Built REST APIs using Node.js, React, PostgreSQL. Led team of 2 developers. Skills: JavaScript, React, Node.js, Docker",
+    "targetRole": "Senior Full-Stack Engineer"
+  }' | jq
+```
+
+With job description (for targeted optimization):
+```bash
+curl -X POST http://localhost:3000/api/resume/optimize \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resumeText": "Data Analyst with 2 years experience in SQL, Python, Excel. Created dashboards and analyzed customer data. Skills: SQL, Python, Tableau",
+    "targetRole": "Senior Data Scientist",
+    "jobDescription": "Looking for Senior Data Scientist with Python, ML, TensorFlow, AWS. 5+ years experience required."
+  }' | jq
+```
+
+LaTeX resume (auto-converts to plain text):
+```bash
+curl -X POST http://localhost:3000/api/resume/optimize \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resumeText": "\\documentclass{article}\n\\begin{document}\n\\section{Experience}\n\\textbf{DevOps Engineer} at Tech Corp\n\\begin{itemize}\n\\item Built CI/CD pipelines\n\\item Managed Kubernetes clusters\n\\end{itemize}\n\\end{document}",
+    "targetRole": "Senior DevOps Engineer"
+  }' | jq
+```
+
+Fields (body):
+- `resumeText` (string, required): Resume content (plain text or LaTeX)
+- `targetRole` (string, optional): Target job title
+- `jobDescription` (string, optional): Job description for keyword alignment
+
+Response structure:
+```json
+{
+  "success": true,
+  "result": {
+    "atsScore": 65,
+    "rationale": "...",
+    "topFixes": ["...", "..."],
+    "keywordGap": {
+      "missing": ["CI/CD", "Terraform", "AWS"],
+      "underrepresented": ["Kubernetes"],
+      "recommendedAdditions": [
+        { "keyword": "Terraform", "where": "skills section" }
+      ]
+    },
+    "rewrittenBullets": [
+      { "original": "...", "improved": "..." }
+    ],
+    "skillsSection": {
+      "core": ["Python", "SQL"],
+      "tools": ["Docker", "Kubernetes"],
+      "cloud": ["AWS", "GCP"],
+      "data": [],
+      "other": []
+    },
+    "formattingNotes": ["Remove tables", "Use standard headers"]
+  },
+  "resumeFormatDetected": "latex",
+  "generatedAt": "2026-01-05T10:30:00Z"
+}
+```
+
+**Output includes:**
+- `atsScore`: 0-100 ATS compatibility score
+- `topFixes`: 3-5 critical improvements
+- `keywordGap`: Missing/underrepresented keywords
+- `rewrittenBullets`: 6-10 improved bullet points
+- `skillsSection`: Categorized skills (core/tools/cloud/data/other)
+- `formattingNotes`: ATS-blocking issues (tables, columns, special chars)
+
+### 11. Explore (Unified Career + Geo/Policy Consolidation)
 
 Generates one cohesive expert answer by:
 1. Producing internal career insights (skills, trends, advice) using stored news + LLM.
@@ -456,7 +722,7 @@ GET /api/insights?skills=python,machine-learning&role=data-scientist&experience=
 | `BQ_DATASET` | BigQuery dataset name | `career_insights` | ❌ |
 | `BQ_NEWS_TABLE` | BigQuery table name | `news_articles` | ❌ |
 | `LOCATION` | Google Cloud region | `us-central1` | ❌ |
-| `VERTEX_GEN_MODEL` | Vertex AI model name | `gemini-1.5-pro` | ❌ |
+| `VERTEX_GEN_MODEL` | Vertex AI model name | `gemini-2.5-flash` | ❌ |
 | `PORT` | Server port | `3000` | ❌ |
 | `GEO_DATA_API_URL` | Base URL of external geo/policy enrichment service (must expose POST /query) | - | ❌ |
 | `GEO_QUERY_TIMEOUT_MS` | Timeout (ms) for geo/policy request (0 = no timeout) | `45000` | ❌ |
