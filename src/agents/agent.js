@@ -38,7 +38,7 @@ YOUR ROLE:
 - Provide actionable milestones with clear timelines
 
 WORKFLOW:
-1. GATHER CONTEXT: Extract role, skills, experience level, and goals from user input
+1. GATHER CONTEXT: Extract role, skills, experience , and goals from user input
 2. ANALYZE MARKET: Call getCareerInsights with role and/or profileFreeText (do not block on missing skills; infer from context)
 3. ADD CONTEXT: Use getOverview when broader market trends, emerging technologies, or industry news is needed
 4. SYNTHESIZE: Use synthesizeReport only if user explicitly provides two separate text sources to combine
@@ -55,6 +55,59 @@ GUIDELINES:
 - Make reasonable assumptions based on role/level when details are sparse
 - Be direct, actionable, and data-driven
 - Reference real market signals from tools when available`
+});
+
+// 1b) Career Plan (JSON) Agent
+export const careerPlanJsonAgent = new LlmAgent({
+  name: 'CareerPlanJsonAgent',
+  model: 'gemini-2.0-flash',
+  description: 'Generates a concise career plan in strict JSON with plan name, description, and duration.',
+  tools: [insightsTool, overviewTool, trendingSkillsTool, validateSkillsTool],
+  instructions: `You are an expert career strategist.
+
+GOAL:
+Given the user's background and goals, produce a concise career plan summary.
+
+OUTPUT REQUIREMENTS (STRICT):
+- Return ONLY valid minified JSON. No markdown. No extra keys. No commentary.
+- Schema:
+  {
+    "careerPlanName": string,
+    "description": string,
+    "duration": string,
+    "level": "Beginner" | "Intermediate" | "Advanced",
+    "confidence": number,
+    "tags": string[],
+    "keyFocusAreas": string[],
+    "milestones": [
+      {
+        "title": string,
+        "timeframe": string,
+        "outcome": string
+      }
+    ],
+    "quickWins": string[]
+  }
+
+WORKFLOW:
+1) Extract target role/career direction, current skills, experience, and constraints from user input.
+2) Call getCareerInsights when a target role or career direction can be inferred.
+3) Optionally call getOverview and/or validateSkillsAgainstMarket for market signals.
+4) Write the final JSON.
+
+CONTENT RULES:
+- careerPlanName: short and specific (e.g., "Backend Engineer Transition Plan").
+- duration: realistic total duration (e.g., "6 months", "12 months", "18 months").
+- description: 3-6 sentences summarizing the plan at a high level (no bullets), aligned to market signals when available.
+- level: infer from experience.
+- confidence: 0-100 integer; reflect how complete the user info was.
+- tags: 3-8 short tags useful for UI chips (e.g., "Full Stack", "Projects", "Interview Prep").
+- keyFocusAreas: 4-7 items (e.g., "Backend fundamentals", "System design", "Projects/portfolio", "Interview prep").
+- milestones: 6-10 items, each with a clear timeframe (e.g., "Weeks 1-2", "Month 3") and a concrete outcome.
+- quickWins: 3-5 items that can be done within 1 week.
+- If critical info is missing, make reasonable assumptions inside the description (do NOT ask questions).
+
+Return ONLY the JSON object.`
 });
 
 // 2) Skill Gap & Roadmap Agent
@@ -299,6 +352,7 @@ GUIDELINES:
 
 export const agents = {
   careerPlanningAgent,
+  careerPlanJsonAgent,
   skillGapRoadmapAgent,
   ragIntelligenceAgent,
   feedbackAdaptationAgent,

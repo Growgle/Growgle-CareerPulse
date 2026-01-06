@@ -24,10 +24,11 @@ npm start     # prod
 
 ## 🤖 Agentic Mode (Google ADK)
 
-This repo includes 5 Google ADK agents exposed via the API route `POST /api/agent/:name`.
+This repo includes multiple Google ADK agents exposed via the API route `POST /api/agent/:name`.
 
 Agent names (use these in the URL):
 - `careerPlanningAgent`
+- `careerPlanJsonAgent`
 - `skillGapRoadmapAgent`
 - `ragIntelligenceAgent`
 - `feedbackAdaptationAgent`
@@ -46,6 +47,20 @@ curl -sS http://localhost:3000/api/agent/careerPlanningAgent \
   -d '{
     "prompt": "I am a software engineering student. Suggest the best career path for me and a 12-month plan."
   }'
+```
+
+Career Plan JSON Agent:
+```bash
+curl -sS http://localhost:3000/api/agent/careerPlanJsonAgent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "I have 6 months frontend experience (HTML/CSS/JS/React). I want to become a Full Stack Developer. Give me a plan."
+  }'
+```
+
+Response (example shape):
+```json
+{"careerPlanName":"...","description":"...","duration":"...","level":"Intermediate","confidence":75,"tags":["..."],"keyFocusAreas":["..."],"milestones":[{"title":"...","timeframe":"...","outcome":"..."}],"quickWins":["..."]}
 ```
 
 Skill Gap & Roadmap Agent:
