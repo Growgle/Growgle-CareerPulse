@@ -93,6 +93,22 @@ app.use('/api/jobs', jobsRoutes);
 // Agent endpoint
 const activeRunners = new Map(); // Store runners by sessionId
 
+function tryParseEmbeddedJson(text) {
+  const raw = typeof text === 'string' ? text.trim() : '';
+  if (!raw) return null;
+
+  const firstBrace = raw.indexOf('{');
+  const lastBrace = raw.lastIndexOf('}');
+  if (firstBrace < 0 || lastBrace <= firstBrace) return null;
+
+  const candidate = raw.slice(firstBrace, lastBrace + 1);
+  try {
+    return JSON.parse(candidate);
+  } catch {
+    return null;
+  }
+}
+
 app.post('/api/agent/:name', async (req, res) => {
   const { name } = req.params;
   const { prompt, sessionId: providedSessionId } = req.body;
@@ -141,7 +157,8 @@ app.post('/api/agent/:name', async (req, res) => {
       }
     }
 
-    res.json({ success: true, result: finalResponse, sessionId });
+    const parsedJson = tryParseEmbeddedJson(finalResponse);
+    res.json({ success: true, result: parsedJson ?? finalResponse, sessionId });
   } catch (error) {
     console.error(`Agent '${name}' error:`, error);
     res.status(500).json({ success: false, error: error.message });
