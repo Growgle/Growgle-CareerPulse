@@ -69,6 +69,18 @@ Return ONLY valid minified JSON (no markdown, no commentary before/after). Shape
       "value": "High" | "Medium" | "Low",
       "priority": "Recommended" | "Optional" | "Stretch"
     }
+  ],
+  "nextActions": [
+    {
+      "id": number, // Must match the corresponding roadmap milestone ID
+      "title": string,
+      "type": "course" | "project" | "certification" | "reading" | "practice",
+      "duration": string,
+      "status": "in-progress" | "pending",
+      "provider": string,
+      "description": string, // Visual status line, e.g., "Start today • 2 weeks remaining"
+      "priority": "High" | "Medium"
+    }
   ]
 }
 
@@ -78,16 +90,17 @@ LOGIC & RULES:
 - completionRate (%) should reflect weighted progress over all milestones.
 - Milestone durations: use weeks for granular items; phase duration sum should roughly match totalDuration.
 - If no targetDuration provided, choose a realistic total (e.g., 6, 9, or 12 months) based on breadth.
-- Ensure IDs are unique and sequential across milestones (phase ordering preserved) but milestone IDs must not reset inside a phase in a way that conflicts.
+- Ensure IDs are unique and sequential across milestones.
 - Tailor content to ${requestedTitle}. Avoid generic filler.
 - Include at least 1 project milestone each phase (except possibly a pure certification phase).
 - Keep provider names credible (Official Docs, freeCodeCamp, Coursera, AWS, etc.).
+- nextActions: Select exactly 6 of the most immediate 'in-progress' or 'pending' milestones from the roadmap phases. The object structure MUST match roadmap milestones (id, title, type, duration, status, provider) PLUS include the 'description' (marketing/status line) and 'priority' fields.
 - Output VALID JSON ONLY.`;
 
     const aiRaw = await geminiClient.generateContent(prompt, {
       responseMimeType: 'application/json',
       temperature: 0.4,
-      maxTokens: 4000
+      maxTokens: 6000
     });
 
     const rawText = (aiRaw && aiRaw.text ? String(aiRaw.text).trim() : '');
@@ -109,6 +122,7 @@ LOGIC & RULES:
       success: true,
       roadmap: parsed.roadmapData,
       certifications: parsed.certifications || [],
+      nextActions: parsed.nextActions || [],
       finishReason: aiRaw?.finishReason
     };
   }
