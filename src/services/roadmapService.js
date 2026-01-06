@@ -70,22 +70,12 @@ Return ONLY valid minified JSON (no markdown, no commentary before/after). Shape
       "priority": "Recommended" | "Optional" | "Stretch"
     }
   ],
-  "nextActions": [
-    {
-      "id": number, // Must match the corresponding roadmap milestone ID
-      "title": string,
-      "type": "course" | "project" | "certification" | "reading" | "practice",
-      "duration": string,
-      "status": "in-progress" | "pending",
-      "provider": string,
-      "description": string, // Visual status line, e.g., "Start today • 2 weeks remaining"
-      "priority": "High" | "Medium"
-    }
-  ]
 }
 
 LOGIC & RULES:
-- Max 3 phases total. Max 2 milestones per phase. Order them logically (fundamentals -> specialization -> integration -> professional polish).
+- Generate at least 7 phases total.
+- Each phase must have 2-3 milestones.
+- Order phases logically (fundamentals -> specialization -> integration -> professional polish).
 - A phase or milestone is 'completed' only if its core skills are already in user skills. Partially covered => 'in-progress'. Others 'pending'.
 - completionRate (%) should reflect weighted progress over all milestones.
 - Milestone durations: use weeks for granular items; phase duration sum should roughly match totalDuration.
@@ -94,13 +84,12 @@ LOGIC & RULES:
 - Tailor content to ${requestedTitle}. Avoid generic filler.
 - Include at least 1 project milestone each phase (except possibly a pure certification phase).
 - Keep provider names credible (Official Docs, freeCodeCamp, Coursera, AWS, etc.).
-- nextActions: Select exactly 6 of the most immediate 'in-progress' or 'pending' milestones from the roadmap phases. The object structure MUST match roadmap milestones (id, title, type, duration, status, provider) PLUS include the 'description' (marketing/status line) and 'priority' fields.
 - Output VALID JSON ONLY.`;
 
     const aiRaw = await geminiClient.generateContent(prompt, {
       responseMimeType: 'application/json',
       temperature: 0.4,
-      maxTokens: 6000
+      maxTokens: 8000
     });
 
     const rawText = (aiRaw && aiRaw.text ? String(aiRaw.text).trim() : '');
@@ -122,7 +111,6 @@ LOGIC & RULES:
       success: true,
       roadmap: parsed.roadmapData,
       certifications: parsed.certifications || [],
-      nextActions: parsed.nextActions || [],
       finishReason: aiRaw?.finishReason
     };
   }
