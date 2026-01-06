@@ -60,7 +60,7 @@ curl -sS http://localhost:3000/api/agent/careerPlanJsonAgent \
 
 Response (example shape):
 ```json
-{"careerPlanName":"...","description":"...","duration":"...","level":"Intermediate","confidence":75,"tags":["..."],"keyFocusAreas":["..."],"milestones":[{"title":"...","timeframe":"...","outcome":"..."}],"quickWins":["..."]}
+{"careerPlanName":"...","description":"...","duration":"...","keyFocusAreas":["..."],"topSkillsToBuild":["..."],"milestones":[{"title":"...","timeframe":"...","outcome":"..."}],"quickWins":["..."]}
 ```
 
 Skill Gap & Roadmap Agent:

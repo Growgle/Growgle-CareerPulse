@@ -75,10 +75,8 @@ OUTPUT REQUIREMENTS (STRICT):
     "careerPlanName": string,
     "description": string,
     "duration": string,
-    "level": "Beginner" | "Intermediate" | "Advanced",
-    "confidence": number,
-    "tags": string[],
     "keyFocusAreas": string[],
+    "topSkillsToBuild": string[],
     "milestones": [
       {
         "title": string,
@@ -99,10 +97,8 @@ CONTENT RULES:
 - careerPlanName: short and specific (e.g., "Backend Engineer Transition Plan").
 - duration: realistic total duration (e.g., "6 months", "12 months", "18 months").
 - description: 3-6 sentences summarizing the plan at a high level (no bullets), aligned to market signals when available.
-- level: infer from experience.
-- confidence: 0-100 integer; reflect how complete the user info was.
-- tags: 3-8 short tags useful for UI chips (e.g., "Full Stack", "Projects", "Interview Prep").
 - keyFocusAreas: 4-7 items (e.g., "Backend fundamentals", "System design", "Projects/portfolio", "Interview prep").
+- topSkillsToBuild: 6-10 items, role-relevant, ordered by priority.
 - milestones: 6-10 items, each with a clear timeframe (e.g., "Weeks 1-2", "Month 3") and a concrete outcome.
 - quickWins: 3-5 items that can be done within 1 week.
 - If critical info is missing, make reasonable assumptions inside the description (do NOT ask questions).
