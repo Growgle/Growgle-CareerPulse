@@ -169,6 +169,7 @@ Then open the URL shown in the terminal output (it will typically be something l
 | POST | `/api/prompt` | Direct Gemini (LLM) pass-through prompt |
 | POST | `/api/explore` | Unified consolidated answer (career + external geo/policy) |
 | POST | `/api/job-prep` | End-to-end job prep (gap analysis + roadmap + strategy) |
+| POST | `/api/interview-prep` | Interview prep (common questions + skills focus) from a job JSON |
 | POST | `/api/resume/optimize` | Optimize resume (ATS score, keyword gaps, rewrites) |
 | POST | `/api/jobs/match` | Search ingested jobs in BigQuery (deterministic JSON) |
 
@@ -218,6 +219,37 @@ curl -X POST http://localhost:3000/api/ingest/news \
 ### 3. Get Career Insights (GET)
 ```bash
 curl "http://localhost:3000/api/insights?skills=python,javascript,react&role=software%20engineer&experience=mid-level"
+```
+
+### Interview Prep (from a Job JSON)
+
+Request:
+```bash
+curl -sS -X POST http://localhost:3000/api/interview-prep \
+  -H "Content-Type: application/json" \
+  -d '{
+    "job": {
+      "job_id": "URZN3hptJeoJpGr6AAAAAA==",
+      "title": "AI Senior Software Engineer",
+      "company_name": "General Motors",
+      "location": "Austin",
+      "employment_type": "Full-time",
+      "description": "PASTE FULL JOB DESCRIPTION HERE",
+      "requiredSkills": [],
+      "fitScore": 89
+    }
+  }' | jq
+```
+
+Response (shape):
+```json
+{
+  "success": true,
+  "interviewPrepData": {
+    "commonQuestions": ["..."],
+    "keySkillsFocus": ["..."]
+  }
+}
 ```
 
 Career Insights (POST, free text only):

@@ -1,6 +1,7 @@
 import express from 'express';
 import resumeOptimizationService from '../services/resumeOptimizationService.js';
 import jobPrepService from '../services/jobPrepService.js';
+import interviewPrepService from '../services/interviewPrepService.js';
 
 const router = express.Router();
 
@@ -36,6 +37,22 @@ router.post('/job-prep', async (req, res) => {
       body.rawOutputSnippet = error.rawOutputSnippet;
     }
     res.status(500).json(body);
+  }
+});
+
+// Interview Prep from a specific job object (normal service)
+router.post('/interview-prep', async (req, res) => {
+  try {
+    // Accept either { job: {...} } or the job object directly.
+    const body = req.body || {};
+    const job = body.job && typeof body.job === 'object' ? body.job : body;
+    const candidateProfile = body.candidateProfile ?? null;
+
+    const result = await interviewPrepService.generate({ job, candidateProfile });
+    res.json(result);
+  } catch (error) {
+    console.error('Interview prep error:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

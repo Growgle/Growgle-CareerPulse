@@ -73,7 +73,7 @@ Return ONLY JSON.`;
     const repaired = await geminiClient.generateContent(repairPrompt, {
       responseMimeType: 'application/json',
       temperature: 0.1,
-      maxTokens: 3600,
+      maxTokens: 6000,
     });
 
     try {

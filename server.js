@@ -155,9 +155,62 @@ function tryParseEmbeddedJson(text) {
   return null;
 }
 
+function buildCareerPlanJsonPrompt(inputObj) {
+  const {
+    role,
+    skills,
+    experience,
+    interests,
+    ...rest
+  } = inputObj || {};
+
+  const lines = [];
+  if (role) lines.push(`Role: ${role}`);
+  if (skills) lines.push(`Skills: ${skills}`);
+  // keep interests optional but present if provided
+  if (typeof interests === 'string' && interests.trim()) {
+    lines.push(`Interests: ${interests.trim()}`);
+  }
+  if (experience !== undefined) {
+    lines.push(`Experience (JSON): ${JSON.stringify(experience)}`);
+  }
+
+  const restKeys = Object.keys(rest || {});
+  if (restKeys.length) {
+    lines.push(`Additional context (JSON): ${JSON.stringify(rest)}`);
+  }
+
+  // If user sends an empty object, still stringify it rather than sending empty text.
+  return lines.length ? lines.join('\n') : JSON.stringify(inputObj);
+}
+
 app.post('/api/agent/:name', async (req, res) => {
   const { name } = req.params;
   const { prompt, sessionId: providedSessionId } = req.body;
+
+  const rawPrompt = prompt;
+  let promptText = null;
+
+  if (typeof rawPrompt === 'string') {
+    promptText = rawPrompt.trim();
+  } else if (rawPrompt && typeof rawPrompt === 'object') {
+    // Only this agent supports structured prompt objects.
+    if (name === 'careerPlanJsonAgent') {
+      promptText = buildCareerPlanJsonPrompt(rawPrompt);
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: `Agent '${name}' expects prompt to be a string. Structured prompt objects are only supported for 'careerPlanJsonAgent'.`
+      });
+    }
+  }
+
+  if (!promptText) {
+    return res.status(400).json({
+      success: false,
+      error: 'Missing prompt. Send { prompt: "..." }.'
+    });
+  }
 
   const agent = agents[name];
   if (!agent) {
@@ -189,7 +242,7 @@ app.post('/api/agent/:name', async (req, res) => {
     const iterator = runner.runAsync({
       userId,
       sessionId,
-      newMessage: { role: 'user', parts: [{ text: prompt }] }
+      newMessage: { role: 'user', parts: [{ text: promptText }] }
     });
 
     let finalResponse = '';
@@ -239,7 +292,7 @@ app.get('/', (req, res) => {
         }
       },
       agents: {
-        run: 'POST /api/agent/:name { prompt }',
+        run: 'POST /api/agent/:name { prompt, sessionId? }',
         available: Object.keys(agents)
       }
     }
