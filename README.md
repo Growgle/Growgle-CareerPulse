@@ -32,6 +32,7 @@ Agent names (use these in the URL):
 - `skillGapRoadmapAgent`
 - `ragIntelligenceAgent`
 - `feedbackAdaptationAgent`
+- `jobsMatchAgent`
 - `jobSearchApplicationAgent`
 
 Request body:
@@ -99,6 +100,15 @@ curl -sS http://localhost:3000/api/agent/jobSearchApplicationAgent \
   }'
 ```
 
+Jobs Match Agent (strict JSON, BigQuery-backed; mirrors `POST /api/jobs/match`):
+```bash
+curl -sS http://localhost:3000/api/agent/jobsMatchAgent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "query=devops engineer in india; location=Bengaluru; limit=10"
+  }' | jq
+```
+
 Resume Optimization Agent:
 ```bash
 curl -sS http://localhost:3000/api/agent/resumeOptimizationAgent \
@@ -160,6 +170,7 @@ Then open the URL shown in the terminal output (it will typically be something l
 | POST | `/api/explore` | Unified consolidated answer (career + external geo/policy) |
 | POST | `/api/job-prep` | End-to-end job prep (gap analysis + roadmap + strategy) |
 | POST | `/api/resume/optimize` | Optimize resume (ATS score, keyword gaps, rewrites) |
+| POST | `/api/jobs/match` | Search ingested jobs in BigQuery (deterministic JSON) |
 
 Notes:
 - This endpoint aggregates data from BigQuery only (no Gemini/LLM calls).
@@ -316,6 +327,43 @@ Fields (body):
 - `skills`: comma-separated or array of existing skills
 - `currentExperience`: free-text description (optional)
 - `targetDuration`: hint like `9 months` (optional)
+
+### 7b. Match Jobs (Ingested BigQuery Search)
+
+Deterministic job matching (no agent/LLM required). Searches your ingested jobs stored in BigQuery.
+
+```bash
+curl -sS -X POST http://localhost:3000/api/jobs/match \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "data scientist python ml azure databricks",
+    "location": "Bengaluru",
+    "limit": 20
+  }' | jq
+```
+
+Response shape:
+```json
+{
+  "success": true,
+  "source": "bigquery",
+  "query": "...",
+  "location": "...",
+  "count": 0,
+  "jobs": [
+    {
+      "job_id": "...",
+      "title": "...",
+      "company_name": "...",
+      "location": "...",
+      "employment_type": "...",
+      "description": "...",
+      "apply_link": "...",
+      "ingested_at": "..."
+    }
+  ]
+}
+```
 
 Response (shape example – abbreviated):
 ```json

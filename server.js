@@ -97,16 +97,62 @@ function tryParseEmbeddedJson(text) {
   const raw = typeof text === 'string' ? text.trim() : '';
   if (!raw) return null;
 
-  const firstBrace = raw.indexOf('{');
-  const lastBrace = raw.lastIndexOf('}');
-  if (firstBrace < 0 || lastBrace <= firstBrace) return null;
+  // 1) Strip common ```json fences
+  const unfenced = raw
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/i, '')
+    .trim();
 
-  const candidate = raw.slice(firstBrace, lastBrace + 1);
+  // 2) If the whole thing is valid JSON, parse it.
   try {
-    return JSON.parse(candidate);
+    return JSON.parse(unfenced);
   } catch {
-    return null;
+    // fall through
   }
+
+  // 3) Find the first balanced JSON object/array within surrounding text.
+  const start = unfenced.search(/[\[{]/);
+  if (start < 0) return null;
+
+  const open = unfenced[start];
+  const close = open === '{' ? '}' : ']';
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start; i < unfenced.length; i++) {
+    const ch = unfenced[i];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === '\\') {
+        escaped = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (ch === open) depth++;
+    if (ch === close) depth--;
+
+    if (depth === 0) {
+      const candidate = unfenced.slice(start, i + 1);
+      try {
+        return JSON.parse(candidate);
+      } catch {
+        return null;
+      }
+    }
+  }
+
+  return null;
 }
 
 app.post('/api/agent/:name', async (req, res) => {
@@ -158,7 +204,7 @@ app.post('/api/agent/:name', async (req, res) => {
     }
 
     const parsedJson = tryParseEmbeddedJson(finalResponse);
-    res.json({ success: true, result: parsedJson ?? finalResponse, sessionId });
+    return res.json({ success: true, result: parsedJson ?? finalResponse, sessionId });
   } catch (error) {
     console.error(`Agent '${name}' error:`, error);
     res.status(500).json({ success: false, error: error.message });

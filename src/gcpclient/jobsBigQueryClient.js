@@ -107,6 +107,65 @@ class JobsBigQueryClient {
     const [rows] = await bq.query({ query: sql, params, types });
     return rows || [];
   }
+
+  async searchJobs({ query, location, limit = 20 } = {}) {
+    const bq = this.initClient();
+    const fqtn = PROJECT_ID ? `\`${PROJECT_ID}.${DATASET}.${TABLE}\`` : `\`${DATASET}.${TABLE}\``;
+
+    const q = String(query || '').trim();
+    const loc = String(location || '').trim();
+    const cap = Math.min(Number(limit) || 20, 100);
+
+    // Escape regex metacharacters in user text
+    const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const terms = q
+      ? q
+          .split(/[\s,]+/)
+          .map((t) => t.trim())
+          .filter(Boolean)
+          .slice(0, 12)
+      : [];
+
+    const pattern = terms.length ? `(?i)(${terms.map(escapeRegex).join('|')})` : '';
+    const locPattern = loc ? `(?i)${escapeRegex(loc)}` : '';
+
+    const where = [];
+    if (pattern) {
+      // Search across title/company/location/description
+      where.push(
+        `REGEXP_CONTAINS(COALESCE(title,''), @pattern)
+         OR REGEXP_CONTAINS(COALESCE(company_name,''), @pattern)
+         OR REGEXP_CONTAINS(COALESCE(location,''), @pattern)
+         OR REGEXP_CONTAINS(COALESCE(description,''), @pattern)`
+      );
+    }
+    if (locPattern) {
+      where.push(`REGEXP_CONTAINS(COALESCE(location,''), @locPattern)`);
+    }
+
+    const sql = `
+      SELECT job_id, title, company_name, location, employment_type, description, apply_link, ingested_at
+      FROM ${fqtn}
+      WHERE job_id IS NOT NULL AND title IS NOT NULL
+      ${where.length ? `AND ( ${where.join(') AND ( ')} )` : ''}
+      ORDER BY ingested_at DESC
+      LIMIT @limit
+    `;
+
+    const params = { limit: cap };
+    const types = { limit: 'INT64' };
+    if (pattern) {
+      params.pattern = pattern;
+      types.pattern = 'STRING';
+    }
+    if (locPattern) {
+      params.locPattern = locPattern;
+      types.locPattern = 'STRING';
+    }
+
+    const [rows] = await bq.query({ query: sql, params, types });
+    return rows || [];
+  }
 }
 
 export default new JobsBigQueryClient();

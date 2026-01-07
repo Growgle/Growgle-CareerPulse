@@ -1,5 +1,5 @@
 import express from 'express';
-import jobsService, { syncBqToTalent, bqFetchLatestJobs } from '../services/jobsService.js';
+import jobsService, { syncBqToTalent, bqFetchLatestJobs, bqSearchIngestedJobs } from '../services/jobsService.js';
 
 const router = express.Router();
 
@@ -77,6 +77,51 @@ router.get('/latest', async (req, res) => {
     res.json({ success: true, source: 'bigquery', count: rows.length, jobs: rows });
   } catch (error) {
     console.error('Latest jobs fetch error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// BigQuery: search ingested jobs (deterministic, dashboard-friendly)
+router.post('/match', async (req, res) => {
+  try {
+    const { query = '', location = '', limit = 20 } = req.body || {};
+    const q = String(query || '').trim();
+    if (!q) {
+      return res.status(400).json({ success: false, error: "'query' is required" });
+    }
+
+    const lim = Math.min(Number(limit) || 20, 100);
+    const rows = await bqSearchIngestedJobs({ query: q, location: String(location || '').trim(), limit: lim });
+
+    const normalizeIngestedAt = (v) => {
+      if (!v) return null;
+      if (typeof v === 'string') return v;
+      if (v?.value) return String(v.value);
+      if (v instanceof Date) return v.toISOString();
+      return String(v);
+    };
+
+    const jobs = (rows || []).map((r) => ({
+      job_id: r.job_id,
+      title: r.title,
+      company_name: r.company_name ?? null,
+      location: r.location ?? null,
+      employment_type: r.employment_type ?? null,
+      description: r.description ?? null,
+      apply_link: r.apply_link ?? null,
+      ingested_at: normalizeIngestedAt(r.ingested_at)
+    }));
+
+    res.json({
+      success: true,
+      source: 'bigquery',
+      query: q,
+      location: String(location || '').trim(),
+      count: jobs.length,
+      jobs
+    });
+  } catch (error) {
+    console.error('Jobs match error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

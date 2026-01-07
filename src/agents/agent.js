@@ -22,6 +22,7 @@ const exploreRagTool = new FunctionTool(tools.exploreRagTool);
 const trendingSkillsTool = new FunctionTool(tools.getTrendingSkillsTool);
 const latestJobsTool = new FunctionTool(tools.getLatestJobsTool);
 const validateSkillsTool = new FunctionTool(tools.validateSkillsAgainstMarketTool);
+const matchIngestedJobsTool = new FunctionTool(tools.matchIngestedJobsTool);
 
 // 1) Career Planning Agent
 export const careerPlanningAgent = new LlmAgent({
@@ -232,7 +233,7 @@ WORKFLOW:
 2. SEARCH OPPORTUNITIES: Call searchJobs with relevant filters (ask for location if missing; use provided skills/role)
 3. PRESENT MATCHES: Show top opportunities with relevance rationale
 4. INGEST DATA: Use ingestJobs ONLY when user explicitly requests to sync/ingest job data into the system
-5. DRAFT MATERIALS: Generate tailored resume bullets, cover letters, or cold emails upon request
+5. DRAFT MATERIALS: Generate tailored application materials upon request
 
 OUTPUT FORMAT (for job search):
 - Top 5-10 matching opportunities with role, company, location, fit score
@@ -252,6 +253,49 @@ GUIDELINES:
 - Keep cold emails under 150 words
 - Provide honest fit assessment; don't force mismatches
 - Include next steps and deadlines when applicable`
+});
+
+// 5b) Jobs Match (JSON) Agent
+export const jobsMatchAgent = new LlmAgent({
+  name: 'JobsMatchAgent',
+  model: 'gemini-2.0-flash',
+  description: 'Deterministic job matching agent that searches ingested jobs in BigQuery and returns strict JSON (same shape as POST /api/jobs/match).',
+  tools: [matchIngestedJobsTool],
+  instructions: `You are a deterministic jobs matching assistant.
+
+GOAL:
+Return job matches from the ingested BigQuery jobs table.
+
+WORKFLOW:
+1) Extract query (required), location (optional), and limit (optional; default 20; max 100).
+2) Call matchIngestedJobs with these inputs.
+3) Return ONLY the tool result.
+
+OUTPUT REQUIREMENTS (STRICT):
+- Return ONLY valid minified JSON. No markdown. No prose.
+- Do NOT add keys. Do NOT rename keys.
+- The JSON must match this schema:
+  {
+    "success": true,
+    "source": "bigquery",
+    "query": string,
+    "location": string,
+    "count": number,
+    "jobs": [
+      {
+        "job_id": string,
+        "title": string,
+        "company_name": string|null,
+        "location": string|null,
+        "employment_type": string|null,
+        "description": string|null,
+        "apply_link": string|null,
+        "ingested_at": string|null
+      }
+    ]
+  }
+
+If the user did not provide a query, ask ONE question: "What job query should I search for?"`
 });
 
 // 6) Resume Optimization Agent
@@ -352,6 +396,7 @@ export const agents = {
   skillGapRoadmapAgent,
   ragIntelligenceAgent,
   feedbackAdaptationAgent,
+  jobsMatchAgent,
   jobSearchApplicationAgent,
   resumeOptimizationAgent,
   jobPrepAgent

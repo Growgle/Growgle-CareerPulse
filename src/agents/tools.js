@@ -209,6 +209,67 @@ export const getLatestJobsTool = {
   }
 };
 
+export const matchIngestedJobsTool = {
+  name: 'matchIngestedJobs',
+  description: 'Searches ingested jobs stored in BigQuery (deterministic JSON; dashboard-friendly).',
+  parameters: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'Search query text (required).' },
+      location: { type: 'string', description: 'Optional location filter.' },
+      limit: { type: 'number', description: 'Max jobs to return (default: 20, max: 100).' },
+      maxDescriptionChars: { type: 'number', description: 'Optional: truncate job descriptions to this many characters (default: 1200, max: 5000).' }
+    },
+    required: ['query']
+  },
+  execute: async ({ query, location = '', limit = 20, maxDescriptionChars = 1200 }) => {
+    const q = String(query || '').trim();
+    if (!q) throwAdkJsonError(400, "'query' is required");
+
+    const loc = String(location || '').trim();
+    const cap = Math.min(Number(limit) || 20, 100);
+
+    const maxDesc = Math.min(Math.max(Number(maxDescriptionChars) || 1200, 0), 5000);
+    const truncate = (value) => {
+      if (value === null || value === undefined) return null;
+      const s = String(value);
+      if (!maxDesc) return null;
+      return s.length > maxDesc ? `${s.slice(0, maxDesc)}…` : s;
+    };
+
+    const { bqSearchIngestedJobs } = await import('../services/jobsService.js');
+    const rows = await bqSearchIngestedJobs({ query: q, location: loc, limit: cap });
+
+    const normalizeIngestedAt = (v) => {
+      if (!v) return null;
+      if (typeof v === 'string') return v;
+      if (v?.value) return String(v.value);
+      if (v instanceof Date) return v.toISOString();
+      return String(v);
+    };
+
+    const jobs = (rows || []).map((r) => ({
+      job_id: r.job_id,
+      title: r.title,
+      company_name: r.company_name ?? null,
+      location: r.location ?? null,
+      employment_type: r.employment_type ?? null,
+      description: truncate(r.description ?? null),
+      apply_link: r.apply_link ?? null,
+      ingested_at: normalizeIngestedAt(r.ingested_at)
+    }));
+
+    return normalizeToolResult({
+      success: true,
+      source: 'bigquery',
+      query: q,
+      location: loc,
+      count: jobs.length,
+      jobs
+    });
+  }
+};
+
 export const validateSkillsAgainstMarketTool = {
   name: 'validateSkillsAgainstMarket',
   description: 'Validates a list of user skills against current market demand and trending data to identify which are in-demand, emerging, or declining.',

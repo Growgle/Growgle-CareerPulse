@@ -157,10 +157,18 @@ export async function bqFetchLatestJobs({ limit = 50 } = {}) {
   return rows;
 }
 
+// BigQuery: search ingested jobs by query/location
+export async function bqSearchIngestedJobs({ query = '', location = '', limit = 20 } = {}) {
+  await jobsBQ.ensureDatasetAndTable();
+  const rows = await jobsBQ.searchJobs({ query, location, limit: Number(limit) || 20 });
+  return rows;
+}
+
 export default {
   fetchAndIngestRapidJobs,
   talentCreateCompany,
   talentCreateJob,
   talentSearchJobs,
-  syncBqToTalent
+  syncBqToTalent,
+  bqSearchIngestedJobs
 };
