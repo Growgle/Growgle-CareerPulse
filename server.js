@@ -93,6 +93,30 @@ app.use('/api/jobs', jobsRoutes);
 // Agent endpoint
 const activeRunners = new Map(); // Store runners by sessionId
 
+function extractToolResponsesFromEvent(event) {
+  const out = [];
+  const parts = event?.content?.parts;
+  if (!Array.isArray(parts)) return out;
+
+  for (const part of parts) {
+    // Common ADK / GenAI shape: { functionResponse: { name, response } }
+    if (part?.functionResponse?.name) {
+      out.push({ name: part.functionResponse.name, response: part.functionResponse.response });
+      continue;
+    }
+
+    // Best-effort fallback: if a tool emitted text, try to parse JSON from it.
+    if (typeof part?.text === 'string' && part.text.trim()) {
+      const parsed = tryParseEmbeddedJson(part.text);
+      if (parsed && typeof parsed === 'object') {
+        out.push({ name: 'unknown', response: parsed });
+      }
+    }
+  }
+
+  return out;
+}
+
 function tryParseEmbeddedJson(text) {
   const raw = typeof text === 'string' ? text.trim() : '';
   if (!raw) return null;
@@ -246,14 +270,27 @@ app.post('/api/agent/:name', async (req, res) => {
     });
 
     let finalResponse = '';
+    const toolResponses = new Map();
     for await (const event of iterator) {
       console.log('Agent Event:', JSON.stringify(event, null, 2));
+
+      // Capture tool responses (so we can return strict JSON deterministically)
+      const extracted = extractToolResponsesFromEvent(event);
+      for (const tr of extracted) {
+        if (!tr?.name) continue;
+        toolResponses.set(tr.name, tr.response);
+      }
       
       // Collect model responses
       if (event.content && event.content.role === 'model') {
         const textParts = event.content.parts.map(p => p.text || '').join('');
         finalResponse += textParts;
       }
+    }
+
+    // For strict-schema agents, prefer the tool response.
+    if (name === 'resumeOptimizationAgent' && toolResponses.has('optimizeResume')) {
+      return res.json({ success: true, result: toolResponses.get('optimizeResume'), sessionId });
     }
 
     const parsedJson = tryParseEmbeddedJson(finalResponse);

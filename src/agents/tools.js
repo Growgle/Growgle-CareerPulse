@@ -4,6 +4,7 @@ import overviewService from '../services/overviewService.js';
 import synthesisService from '../services/synthesisService.js';
 import roadmapService from '../services/roadmapService.js';
 import ragIntelligenceService from '../services/ragIntelligenceService.js';
+import resumeOptimizationService from '../services/resumeOptimizationService.js';
 
 // Tool definitions
 
@@ -306,5 +307,32 @@ export const validateSkillsAgainstMarketTool = {
       inDemandCount: validation.filter(v => v.inDemand).length,
       targetRole
     });
+  }
+};
+
+export const optimizeResumeTool = {
+  name: 'optimizeResume',
+  description: 'Optimizes a resume for ATS and a target role/job description. Returns strict JSON suitable for dashboards.',
+  parameters: {
+    type: 'object',
+    properties: {
+      resumeText: { type: 'string', description: 'Raw resume text (plain text or LaTeX).' },
+      targetRole: { type: 'string', description: 'Target role/title to optimize for (optional but recommended).' },
+      jobDescription: { type: 'string', description: 'Job description text to align keywords to (optional).' }
+    },
+    required: ['resumeText']
+  },
+  execute: async ({ resumeText, targetRole = '', jobDescription = '' }) => {
+    const resume = String(resumeText || '').trim();
+    if (!resume) throwAdkJsonError(400, "'resumeText' is required");
+
+    const out = await resumeOptimizationService.optimize({
+      resumeText: resume,
+      targetRole: String(targetRole || '').trim(),
+      jobDescription: String(jobDescription || '').trim(),
+    });
+
+    // Return ONLY the schema object (atsScore, keywordGap, etc.).
+    return normalizeToolResult(out?.result);
   }
 };

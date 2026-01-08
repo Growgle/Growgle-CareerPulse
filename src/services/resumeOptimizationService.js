@@ -154,8 +154,6 @@ class ResumeOptimizationService {
   "skillsSection": {
     "core": [string],
     "tools": [string],
-    "cloud": [string],
-    "data": [string],
     "other": [string]
   },
   "formattingNotes": [string]
@@ -196,8 +194,6 @@ Return ONLY valid minified JSON (no markdown, no extra text). Shape:
   "skillsSection": {
     "core": [string],
     "tools": [string],
-    "cloud": [string],
-    "data": [string],
     "other": [string]
   },
   "formattingNotes": [string]

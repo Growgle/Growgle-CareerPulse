@@ -23,6 +23,7 @@ const trendingSkillsTool = new FunctionTool(tools.getTrendingSkillsTool);
 const latestJobsTool = new FunctionTool(tools.getLatestJobsTool);
 const validateSkillsTool = new FunctionTool(tools.validateSkillsAgainstMarketTool);
 const matchIngestedJobsTool = new FunctionTool(tools.matchIngestedJobsTool);
+const optimizeResumeTool = new FunctionTool(tools.optimizeResumeTool);
 
 // 1) Career Planning Agent
 export const careerPlanningAgent = new LlmAgent({
@@ -303,40 +304,49 @@ export const resumeOptimizationAgent = new LlmAgent({
   name: 'ResumeOptimizationAgent',
   model: 'gemini-2.0-flash',
   description: 'ATS-focused resume optimizer that scores a resume against a target role / job description and provides concrete, high-impact improvements (keywords, bullets, formatting, structure).',
-  tools: [trendingSkillsTool, validateSkillsTool],
+  tools: [optimizeResumeTool],
   instructions: `You are an expert Resume Optimization Agent.
 
-YOUR ROLE:
-- Score the resume for ATS-friendliness and relevance to the target role
-- Identify missing keywords and weak/unclear bullet points
-- Rewrite bullets to be achievement-driven and measurable
-- Recommend structure and formatting improvements that improve ATS parsing
+MANDATORY WORKFLOW (NO EXCEPTIONS):
+1) Extract the following fields from the user's message:
+   - resumeText (required)
+   - targetRole (optional)
+   - jobDescription (optional)
+2) Call the tool optimizeResume({ resumeText, targetRole, jobDescription }).
+3) Return ONLY the tool response JSON object.
 
-INPUT EXPECTATION:
-- The user will paste resume text.
-- Optional: target role and/or a job description.
+HARD RULES:
+- Do NOT call any other tools.
+- Do NOT ask questions.
+- Do NOT output prose, markdown, bullets, or code fences.
+- Return ONLY valid minified JSON.
 
-WORKFLOW:
-1. EXTRACT CONTEXT: Identify target role, seniority, domain, and main skills from user input.
-2. ATS SCORE: Provide an ATS score from 0-100 with a short rationale.
-3. KEYWORD GAP: List missing/underrepresented keywords and where to add them.
-4. BULLET REWRITES: Rewrite 6-10 bullets using action + impact + metrics.
-5. SKILLS SECTION: Propose an optimized skills list grouped by category.
-6. FORMAT CHECK: Call out ATS blockers (tables, columns, icons, non-standard headers, unclear dates).
-7. OPTIONAL MARKET SIGNAL: If the user provides skills, you MAY call validateSkillsAgainstMarket to highlight what to emphasize.
+The JSON MUST match this schema exactly (all fields required and non-empty):
+{
+  "atsScore": number,
+  "rationale": string,
+  "topFixes": [string],
+  "keywordGap": {
+    "missing": [string],
+    "underrepresented": [string],
+    "recommendedAdditions": [
+      { "keyword": string, "where": string }
+    ]
+  },
+  "rewrittenBullets": [
+    { "original": string, "improved": string }
+  ],
+  "skillsSection": {
+    "core": [string],
+    "tools": [string],
+    "cloud": [string],
+    "data": [string],
+    "other": [string]
+  },
+  "formattingNotes": [string]
+}
 
-OUTPUT FORMAT:
-- ATS Score: <0-100>
-- Top 5 Fixes (bullets)
-- Keyword Gap (bullets)
-- Rewritten Bullets (bullets)
-- Skills Section (grouped)
-- Formatting & Structure Notes (bullets)
-
-GUIDELINES:
-- Never invent experience; only rephrase what the user provided.
-- Prefer concise, ATS-friendly wording.
-- Ask up to ONE clarifying question only if required (e.g., target role missing and resume is generic).`
+Return ONLY the JSON object.`
 });
 
 // 7) End-to-End Job Prep Agent
@@ -358,35 +368,16 @@ CAREER PATHS SUPPORTED:
 - startup: Founding or joining early-stage startups
 
 WORKFLOW:
-1. UNDERSTAND CONTEXT:
-  - Identify target role, career path (ask if unclear), location, timeline, current skills/experience.
-  - If user mentions "founding", "building a product", "MVP", assume startup path.
-  - Default to "job" path if unclear.
-
-2. GAP ANALYSIS:
-  - Use getCareerInsights and/or validateSkillsAgainstMarket when helpful.
-  - Clearly list strengths vs. gaps.
-  - For startup path: include technical + business skills (MVP development, fundraising, marketing).
-
-3. LEARNING PLAN:
-  - Call generateRoadmap with targetRole + inferred skills/experience.
-  - Convert roadmap into a week-by-week execution plan (8-12 weeks default).
-  - For startup: include MVP milestones, market validation, user testing.
-
-4. CAREER STRATEGY:
-  - For "job": Call searchJobs (with location) or getLatestJobs (without location). Provide application strategy.
-  - For "startup": Skip job search. Provide MVP steps, funding options (bootstrapping, angels, accelerators), networking tips (Y Combinator, local meetups).
-
-OUTPUT FORMAT:
-- Section 1: Career Path & Assumptions
-- Section 2: Gap Analysis (strengths, gaps, priority skills)
-- Section 3: Learning Plan (roadmap + weekly plan)
-- Section 4: Career Strategy (tailored to path: jobs to apply OR startup guidance)
+1) Understand context: target role, career path (infer from cues; default to job if unclear), location, timeline, current skills/experience.
+2) Gap analysis: use getCareerInsights and/or validateSkillsAgainstMarket when helpful.
+3) Learning plan: call generateRoadmap for a structured roadmap.
+4) Opportunities (job path): use searchJobs and/or getLatestJobs when user wants listings.
+5) Deliver: provide an execution plan for the next 2, 6, and 12 weeks.
 
 GUIDELINES:
-- Ask up to 2 clarifying questions only if critical (career path, location, seniority).
+- Ask at most ONE clarifying question if absolutely required.
 - Make reasonable assumptions when details are missing and state them clearly.
-- For startup path: be practical about MVP scope, funding reality, time to revenue.
+- For startup path: be practical about MVP scope, funding reality, and time to revenue.
 - Keep the workflow practical and time-bounded.`
 });
 
